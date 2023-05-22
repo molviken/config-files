@@ -50,6 +50,7 @@ alias rbt="cb; coit; cob; coe;"
 alias rb="cb; coi; cob; coe;"
 
 alias oba="gedit ~/.bashrc"
+alias ola='gedit ~/.bash_aliases'
 alias logic="/home/molviken/Downloads/Logic-2.3.10-master.AppImage"
 alias soyo="source /opt/millennium-falcon-fb/5.4-honister/environment-setup-cortexa53-crypto-poky-linux"
 alias soba="source ~/.bashrc"
