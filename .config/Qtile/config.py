@@ -1,26 +1,31 @@
 import os
-import shutil
 import subprocess
 
+from libqtile.log_utils import logger
 from libqtile import bar, layout, widget
 from libqtile.config import Click, Drag, Group, Key, Match, Screen
 from libqtile.lazy import lazy
-from libqtile.log_utils import logger
 
 from libqtile.core.manager import Qtile
 from libqtile.backend.base import Window
 from libqtile.group import _Group
 
-# from colors import colors
+from qtile_extras import widget
+from qtile_extras.widget.decorations import BorderDecoration, PowerLineDecoration
 
-mod = "mod4"
-terminal = "terminator"
-browser = "google-chrome"
-qtile_script="/home/molviken/.local/bin/qtile_commands.sh "
+import colors
+
+sup = "mod4" # super key
+alt = "mod1" # alt key
+
+terminal = "gnome-terminal"
+browser = "brave"
 
 home = os.path.expanduser("~")
 config = f"{home}/.config"
 scripts = f"{config}/qtile/scripts"
+
+qtile_script=f"{scripts}/qtile_commands.sh "
 
 @lazy.function
 def spawn_or_focus(qtile: Qtile, app: str) -> None:
@@ -31,13 +36,13 @@ def spawn_or_focus(qtile: Qtile, app: str) -> None:
             wm_class: list | None = win.get_wm_class()
             if wm_class is None or win.group is None:
                 return
-            if any(item.lower() in app for item in wm_class):
+            if any(item.lower() in app for item in wm_class) or any(app in item.lower() for item in wm_class): # Added OR part to catch ex. 'brave in Brave-browser'
                 window = win
                 group = win.group
-                group.cmd_toscreen()
+                group.toscreen()
                 break
     if window is None:
-        qtile.cmd_spawn(app)
+        qtile.spawn(app)
 
     elif window == qtile.current_window:
         try:
@@ -62,11 +67,11 @@ def spawn_or_focus_role(qtile: Qtile, app: str) -> None:
             if (app in wm_role):
                 window = win
                 group = win.group
-                group.cmd_toscreen()
+                group.toscreen()
                 break
 
     if window is None:
-        qtile.cmd_spawn(qtile_script + app)
+        qtile.spawn(qtile_script + app)
 
     elif window == qtile.current_window:
         try:
@@ -79,112 +84,103 @@ def spawn_or_focus_role(qtile: Qtile, app: str) -> None:
     else:
         qtile.current_group.focus(window)
 
-class PasSwitch(widget.TextBox):
-    name = "PasSwitch"
-    # def __init__(self, **config):
-        # super().__init__("", **config)
-        # My widget's initialisation code here
-        # lazy.spawn("/home/molviken/scripts/switchmon.sh DP1")
-
 keys = [
-    # A list of available commands that can be bound to keys can be found
-    # at https://docs.qtile.org/en/latest/manual/config/lazy.html
     # Switch between windows
-    Key([mod], "f", lazy.spawn('nautilus'), desc="Open file manager"),
-    Key([mod], "z", lazy.spawn(qtile_script + "CONFIG"), desc="Open config"),
-    Key([mod], "h", lazy.layout.left(), desc="Move focus to left"),
-    Key([mod], "l", lazy.layout.right(), desc="Move focus to right"),
-    Key([mod], "j", lazy.layout.down(), desc="Move focus down"),
-    Key([mod], "k", lazy.layout.up(), desc="Move focus up"),
-    Key([mod], "space", lazy.layout.next(), desc="Move window focus to other window"),
+    Key([sup], "h", lazy.layout.left(), desc="Move focus to left"),
+    Key([sup], "l", lazy.layout.right(), desc="Move focus to right"),
+    Key([sup], "j", lazy.layout.down(), desc="Move focus down"),
+    Key([sup], "k", lazy.layout.up(), desc="Move focus up"),
+    Key([sup], "space", lazy.layout.next(), desc="Move window focus to other window"),
+
     # Move windows between left/right columns or move up/down in current stack.
     # Moving out of range in Columns layout will create new column.
-    Key([mod, "shift"], "h", lazy.layout.shuffle_left(), desc="Move window to the left"),
-    Key([mod, "shift"], "l", lazy.layout.shuffle_right(), desc="Move window to the right"),
-    Key([mod, "shift"], "j", lazy.layout.shuffle_down(), desc="Move window down"),
-    Key([mod, "shift"], "k", lazy.layout.shuffle_up(), desc="Move window up"),
+    Key([sup, "shift"], "h", lazy.layout.shuffle_left(), desc="Move window to the left"),
+    Key([sup, "shift"], "l", lazy.layout.shuffle_right(), desc="Move window to the right"),
+    Key([sup, "shift"], "j", lazy.layout.shuffle_down(), desc="Move window down"),
+    Key([sup, "shift"], "k", lazy.layout.shuffle_up(), desc="Move window up"),
     # Grow windows. If current window is on the edge of screen and direction
     # will be to screen edge - window would shrink.
-    Key([mod, "control"], "h", lazy.layout.grow_left(), desc="Grow window to the left"),
-    Key([mod, "control"], "l", lazy.layout.grow_right(), desc="Grow window to the right"),
-    Key([mod, "control"], "j", lazy.layout.grow_down(), lazy.layout.shrink_main(), desc="Grow window down"),
-    Key([mod, "control"], "k", lazy.layout.grow_up(), lazy.layout.grow_main(), desc="Grow window up"),
-    Key([mod], "n", lazy.layout.normalize(), desc="Reset all window sizes"),
+    Key([sup, "control"], "h", lazy.layout.grow_left(), desc="Grow window to the left"),
+    Key([sup, "control"], "l", lazy.layout.grow_right(), desc="Grow window to the right"),
+    Key([sup, "control"], "j", lazy.layout.grow_down(), desc="Grow window down"),
+    Key([sup, "control"], "k", lazy.layout.grow_up(), desc="Grow window up"),
+    Key([sup], "n", lazy.layout.normalize(), desc="Reset all window sizes"),
 
-    Key([mod, "mod1"], "j", lazy.layout.flip_down()),
-    Key([mod, "mod1"], "k", lazy.layout.flip_up()),
-    Key([mod, "mod1"], "h", lazy.layout.flip_left()),
-    Key([mod, "mod1"], "l", lazy.layout.flip_right()),
-    Key([mod, "shift"], "space", lazy.layout.flip()),
+    Key([sup], "Return", lazy.spawn(terminal), desc="Launch terminal"),
 
-    # Toggle between split and unsplit sides of stack.
-    # Split = all windows displayed
-    # Unsplit = 1 window displayed, like Max layout, but still with
-    # multiple stack panes
-    Key(
-        [mod, "shift"],
-        "Return",
-        lazy.layout.toggle_split(),
-        desc="Toggle between split and unsplit sides of stack",
-    ),
-    Key([mod], "Return", lazy.spawn(terminal), desc="Launch terminal"),
     # Toggle between different layouts as defined below
-    Key([mod], "Tab", lazy.next_layout(), desc="Toggle between layouts"),
-    Key([mod], "w", lazy.window.kill(), desc="Kill focused window"),
-    Key([mod, "control"], "r", lazy.reload_config(), desc="Reload the config"),
-    Key([mod, "control"], "q", lazy.shutdown(), desc="Shutdown Qtile"),
-    Key(["mod1", "shift"], "r", lazy.spawncmd(), desc="Spawn a command using a prompt widget"),
-    Key([mod], "r", lazy.spawn(f'rofi -show drun')),
-    Key([mod], "q", lazy.spawn(f"{scripts}/power_menu.sh"), desc="Power menu"),
+    Key([sup], "Tab", lazy.next_layout(), desc="Toggle between layouts"),
+    Key([sup], "w", lazy.window.kill(), desc="Kill focused window"),
+    Key([sup], "t", lazy.window.toggle_floating(), desc="Toggle floating on the focused window"),
 
-    # Be able to spawn a new browser window by force (mod + ctrl), or spawn or focus (mod)
-    Key([mod], "b", spawn_or_focus(browser)),
-    Key([mod, "control"], "b", lazy.spawn(browser)),
+    Key([sup, "control"], "r", lazy.reload_config(), desc="Reload the config"),
+    Key([sup, "control"], "q", lazy.shutdown(), desc="Shutdown Qtile"),
 
-    Key([mod], "t", spawn_or_focus("teams"), spawn_or_focus("microsoft teams - preview")),
-    Key([mod], "m", spawn_or_focus("spotify")),
-    Key(['control', 'mod1'], "l", lazy.screen.next_group(skip_empty=False), desc="Switch to group to the right"),
-    Key(['control', 'mod1'], "h", lazy.screen.prev_group(skip_empty=False), desc="Switch to group to the left"),
-    Key(['control', 'mod1'], "c", lazy.spawn(f"{scripts}/clipboard_menu.sh"), desc="Copy cmds to clipboard"),
+    ############### My keybindings ##############
+    Key([sup], "z", lazy.spawn(qtile_script + "config"), desc="Open config"),
+    Key([sup], "f", lazy.spawn('nautilus'), desc="Open file manager"),
+    Key([sup], "r", lazy.spawn(f'rofi -show drun')),
+
+    # Layout flipping??
+    Key([sup, alt], "j", lazy.layout.flip_down()),
+    Key([sup, alt], "k", lazy.layout.flip_up()),
+    Key([sup, alt], "h", lazy.layout.flip_left()),
+    Key([sup, alt], "l", lazy.layout.flip_right()),
+    Key([sup, "shift"], "space", lazy.layout.flip()),
+
+    # Spotify control
+    Key([sup], "KP_Begin", lazy.spawn(qtile_script + "spotify_pause_play"), desc="Toggle play/pause spotify"),
+    Key([sup], "KP_Right", lazy.spawn(qtile_script + "spotify_next"), desc="Next track spotify"),
+    Key([sup], "KP_Left", lazy.spawn(qtile_script + "spotify_prev"), desc="Previous track spotify"),
+
+    # Navigate groups
+    Key(['control', alt], "l", lazy.screen.next_group(skip_empty=False), desc="Switch to group to the right"),
+    Key(['control', alt], "h", lazy.screen.prev_group(skip_empty=False), desc="Switch to group to the left"),
+    Key(['control', alt], "c", lazy.spawn(f"{scripts}/clipboard_menu.sh"), desc="Copy cmds to clipboard"),
+
+    # Open shit
+    Key([sup], "m", spawn_or_focus("spotify")),
+    Key([sup], "b", spawn_or_focus(browser)),
+    Key([sup, "control"], "b", lazy.spawn(browser)),
 
     # Key bindings relating to screen manipulation (xrandr)
-    Key([mod, 'control'], "1", lazy.spawn(qtile_script + "DP1"), desc="Set DP-1 as primary and turn off eDP-1-1"),
-    Key([mod, 'control'], "2", lazy.spawn(qtile_script + "eDP1"), desc="Set eDP-1-1 as primary and turn off DP-1"),
-    Key([mod, 'control'], "3", lazy.spawn(qtile_script + "DUAL"), desc="Set DP-1 as primary and eDP-1-1 as non-primary"),
-    #Key([mod, 'control'], "4", lazy.spawn("/home/molviken/scripts/qtile_commands.sh"), desc="Menu monitor"),
-
-    # Key bindings for applications
-    Key([mod], "KP_Begin", lazy.spawn(qtile_script + "toggle"), desc="Toggle play/pause spotify"),
-    Key([mod], "KP_Right", lazy.spawn(qtile_script + "next"), desc="Next track spotify"),
-    Key([mod], "KP_Left", lazy.spawn(qtile_script + "prev"), desc="Previous track spotify"),
-
-    Key(["mod1", "shift"], "y", spawn_or_focus_role("yocto_term")),
-    Key(["mod1", "shift"], "e", spawn_or_focus_role("evse_term")),
-    Key(["mod1", "shift"], "p", spawn_or_focus_role("prot_term")),
+    Key([sup, 'control'], "1", lazy.spawn(qtile_script + "display_external"), desc="Set DP-1 as primary and turn off eDP-1-1"),
+    Key([sup, 'control'], "2", lazy.spawn(qtile_script + "display_internal"), desc="Set eDP-1-1 as primary and turn off DP-1"),
+    Key([sup, 'control'], "3", lazy.spawn(qtile_script + "display_dual"), desc="Set DP-1 as primary and eDP-1-1 as non-primary"),
 ]
 
 groups = [
     Group("1", layout="bsp"),
-    Group("2", layout="bsp", matches=[Match(role=["evse_term"])]),
-    Group("3", layout="bsp", matches=[Match(role=["yocto_term"])]),
+    Group("2", layout="bsp"),
+    Group("3", layout="bsp"),
     Group("4", layout="bsp"),
-    Group("5", layout="bsp", matches=[Match(wm_class=[browser])]),
-    Group("6", layout="bsp", matches=[Match(wm_class=["Microsoft Teams - Preview"])]),
+    Group("5", layout="bsp", matches=[Match(wm_class=["brave-browser"])]),
+    Group("6", layout="bsp"),
     Group("7", layout="bsp", matches=[Match(wm_class=["Spotify"])]),
 ]
 
 for i, g in zip(["1", "2", "3", "4", "5", "6", "7"], groups):
-    keys.append(Key(["mod1", "control"], i, lazy.group[g.name].toscreen(), desc=f"Switch to group {g.name}"))
-    keys.append(Key([mod, "shift"], i, lazy.window.togroup(g.name, switch_group=True), desc=f"Switch to & move focused window to group {g.name}"))
+    keys.append(Key([sup], i, lazy.group[g.name].toscreen(), desc=f"Switch to group {g.name}"))
+    keys.append(Key([sup, "shift"], i, lazy.window.togroup(g.name, switch_group=True), desc=f"Switch to & move focused window to group {g.name}"))
+
+colors = colors.DoomOne
+
+### LAYOUTS ###
+layout_theme = {"border_width": 2,
+                "margin": 8,
+                "border_focus": colors[8],
+                "border_normal": colors[0]
+                }
+
 
 layouts = [
     layout.Columns(border_focus_stack=["#d75f5f", "#8f3d3d"], border_width=4),
     layout.Max(),
     # Try more layouts by unleashing below layouts.
     # layout.Stack(num_stacks=2),
-    layout.Bsp(),
+    layout.Bsp(**layout_theme),
     layout.Matrix(),
-    layout.MonadTall(),
+    layout.MonadTall(**layout_theme),
     # layout.MonadWide(),
     # layout.RatioTile(),
     # layout.Tile(),
@@ -195,86 +191,162 @@ layouts = [
 ]
 
 widget_defaults = dict(
-    font="sans",
-    fontsize=12,
-    padding=3,
+    font="Ubuntu Bold",
+    fontsize = 12,
+    padding = 0,
+    background=colors[0]
 )
+
 extension_defaults = widget_defaults.copy()
 
-screens = [
-    Screen(
-        wallpaper="/usr/share/backgrounds/hardy_wallpaper_uhd.png",
-        top=bar.Bar(
-            [
-                widget.CurrentLayout(),
-                widget.Sep(linewidth=5,),
-                widget.GroupBox(),
-                widget.Sep(linewidth=5,),
-                widget.Prompt(),
-                widget.Sep(linewidth=5,),
-                widget.WindowName(),
-                widget.Sep(linewidth=5,),
-                widget.Chord(
-                    chords_colors={
-                        "launch": ("#ff0000", "#ffffff"),
-                    },
-                    name_transform=lambda name: name.upper(),
+powerline = {
+    "decorations": [
+        PowerLineDecoration()
+    ]
+}
+
+def init_widgets_list():
+    widgets_list = [
+        widget.Image(
+                 filename = "~/.config/qtile/icons/gnome-terminal.ico",
+                 scale = "False",
+                 mouse_callbacks = {'Button1': lazy.spawn(terminal)},
+                 ),
+        widget.GroupBox(
+                background = "444444",
+                fontsize = 14,
+                margin_y = 3,
+                margin_x = 4,
+                padding_y = 2,
+                padding_x = 3,
+                borderwidth = 3,
+                active = colors[8],
+                inactive = colors[1],
+                rounded = False,
+                highlight_color = colors[2],
+                highlight_method = "line",
+                this_current_screen_border = colors[7],
+                this_screen_border = colors [4],
+                other_current_screen_border = colors[7],
+                other_screen_border = colors[4],
+                **powerline,
                 ),
-                widget.PulseVolume(),
-                widget.Sep(linewidth=5,),
-                # widget.Mpris2(),
-                widget.Sep(linewidth=5,),
-                widget.Battery(
-                    format="{char} {percent:2.0%}",
+        widget.CurrentLayoutIcon(
+                background = "222222",
+                foreground = colors[5],
+                padding = 5,
+                scale = 0.7
                 ),
-                widget.Sep(linewidth=5,),
-                widget.CPU(
-                    format="{load_percent}%",
-                    update_interval=2,
+        widget.CurrentLayout(
+                background = "222222",
+                foreground = colors[5],
+                padding = 5,
+                fontsize = 14,
+                **powerline,
                 ),
-                widget.Sep(linewidth=5,),
-                widget.Memory(
-                    format="{MemPercent}%",
-                    update_interval=2,
+        widget.Spacer(background = "000000", length = 1200, **powerline),
+        widget.WindowName(
+                background="444444",
+                foreground = colors[7],
+                fontsize = 16,
+                padding = 5,
+                **powerline,
+                max_chars=70,
                 ),
-                widget.Sep(linewidth=5,),
-                PasSwitch(
-                    "TOGGLE | Laptop",
-                    mouse_callbacks={
-                        "Button1": lazy.spawn("/home/molviken/scripts/toggle_audio_cards.sh toggle"),
-                    },
+        widget.CPU(
+                format = '▓  Cpu: {load_percent}%',
+                background="222222",
+                foreground = colors[4],
+                fontsize = 14,
+                **powerline,
                 ),
-                widget.Sep(linewidth=5,),
-                widget.TextBox("default config", name="default"),
-                widget.Sep(linewidth=5,),
-                widget.TextBox("Press &lt;M-r&gt; to spawn", foreground="#d75f5f"),
-                # NB Systray is incompatible with Wayland, consider using StatusNotifier instead
-                # widget.StatusNotifier(),
-                widget.Sep(linewidth=5,),
-                widget.Systray(),
-                widget.Sep(linewidth=5,),
-                widget.Clock(format="%Y-%m-%d %a %I:%M %p"),
-                widget.Sep(linewidth=5,),
-                widget.QuickExit(),
-            ],
-            24,
-            # border_width=[2, 0, 2, 0],  # Draw top and bottom borders
-            # border_color=["ff00ff", "000000", "ff00ff", "000000"]  # Borders are magenta
-        ),
-    ),
-]
+        widget.Memory(
+                background = "000000",
+                foreground = colors[8],
+                mouse_callbacks = {'Button1': lambda: qtile.cmd_spawn(terminal
+
+                + ' -e htop')},
+                format = '{MemUsed: .0f}{mm}',
+                fmt = '🖥  Mem: {} used',
+                fontsize = 14,
+                **powerline,
+                ),
+        widget.DF(
+                background = "444444",
+                padding = 4,
+                update_interval = 60,
+                foreground = colors[5],
+                # mouse_callbacks = {'Button1': lazy.spawn(terminal
+                # + ' -e df')},
+                partition = '/',
+                #format = '[{p}] {uf}{m} ({r:.0f}%)',
+                format = '{uf}{m} free',
+                fmt = '  Disk: {}',
+                visible_on_warn = False,
+                fontsize = 14,
+                **powerline,
+                ),
+        widget.Volume(
+                background = "222222",
+                foreground = colors[7],
+                fmt = '  Vol: {}',
+                padding = 5,
+                fontsize = 14,
+                **powerline,
+                ),
+        widget.KeyboardLayout(
+                background = "000000",
+                configured_keyboards=['no'],
+                foreground = colors[4],
+                fmt = '⌨  Kbd: {}',
+                fontsize = 14,
+                padding = 2,
+                **powerline,
+                ),
+        widget.Clock(
+                padding = 2,
+                background = "444444",
+                foreground = colors[8],
+                format = "⏱  %a, %b %d - %H:%M",
+                fontsize = 14,
+                **powerline
+                ),
+        widget.QuickExit(background="222222", foreground=colors[3], fontsize = 14, padding = 5, **powerline),
+        ]
+    return widgets_list
+
+def init_widgets_screen1():
+    widgets_screen1 = init_widgets_list()
+    return widgets_screen1
+
+def init_widgets_screen2():
+    widgets_screen2 = init_widgets_list()
+    del widgets_screen2[22:24]
+    return widgets_screen2
+
+def init_screens():
+    return [Screen(top=bar.Bar(widgets=init_widgets_screen1(), size=26)),
+            Screen(top=bar.Bar(widgets=init_widgets_screen2(), size=26)),
+            Screen(top=bar.Bar(widgets=init_widgets_screen2(), size=26))]
+
+if __name__ in ["config", "__main__"]:
+    screens = init_screens()
+    widgets_list = init_widgets_list()
+    widgets_screen1 = init_widgets_screen1()
+    widgets_screen2 = init_widgets_screen2()
 
 # Drag floating layouts.
 mouse = [
-    Drag([mod], "Button1", lazy.window.set_position_floating(), start=lazy.window.get_position()),
-    Drag([mod], "Button3", lazy.window.set_size_floating(), start=lazy.window.get_size()),
-    Click([mod], "Button2", lazy.window.bring_to_front()),
+    Drag([sup], "Button1", lazy.window.set_position_floating(), start=lazy.window.get_position()),
+    Drag([sup], "Button3", lazy.window.set_size_floating(), start=lazy.window.get_size()),
+    Click([sup], "Button2", lazy.window.bring_to_front()),
 ]
 
 dgroups_key_binder = None
 dgroups_app_rules = []  # type: list
 follow_mouse_focus = True
 bring_front_click = False
+floats_kept_above = True
 cursor_warp = False
 floating_layout = layout.Floating(
     float_rules=[
@@ -299,12 +371,6 @@ auto_minimize = True
 # When using the Wayland backend, this can be used to configure input devices.
 wl_input_rules = None
 
-# XXX: Gasp! We're lying here. In fact, nobody really uses or cares about this
-# string besides java UI toolkits; you can see several discussions on the
-# mailing lists, GitHub issues, and other WM documentation that suggest setting
-# this string if your java app doesn't work correctly. We may as well just lie
-# and say that we're a working one by default.
-#
 # We choose LG3D to maximize irony: it is a 3D non-reparenting WM written in
 # java that happens to be on java's whitelist.
 wmname = "LG3D"
